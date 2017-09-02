@@ -9,17 +9,21 @@ import (
     "bytes"
 )
 
-func readCommand(cmdName string, cmdArgs string) string {
-    split := strings.Split(cmdArgs, " ")
-    cmd := exec.Command(cmdName, split...)
+func readCommand(cmdName string) string {
+    split := strings.Split(cmdName, " ")
+    cmd := exec.Command(split[0], split[1:]...)
+
     var out bytes.Buffer
     var stderr bytes.Buffer
+
     cmd.Stdout = &out
     cmd.Stderr = &stderr
+
     err := cmd.Run()
     if err != nil {
         return stderr.String()
     }
+
     return out.String()
 }
 
@@ -46,14 +50,14 @@ func countStringsWithPrefixInList(lines []string, prefix string) int64 {
 }
 
 func countCommitDiff(branch string, againstBranch string) (int64, int64) {
-    gitCommits := readCommand("git", "rev-list --left-right " + branch + "..." + againstBranch)
+    gitCommits := readCommand("git rev-list --left-right " + branch + "..." + againstBranch)
     commits := strings.Split(gitCommits, "\n")
     return countStringsWithPrefixInList(commits, "<"), countStringsWithPrefixInList(commits, ">")
 }
 
 func main() {
     text := " "
-    gitStatus := readCommand("git", "status --porcelain -b")
+    gitStatus := readCommand("git status --porcelain -b")
     if (strings.HasPrefix(gitStatus, "fatal")) {
         os.Exit(0)
     }
@@ -73,7 +77,7 @@ func main() {
         remoteBranch = remoteData[0]
     }
 
-    gitBranchList := readCommand("git", "branch --list master")
+    gitBranchList := readCommand("git branch --list master")
     hasMaster := checkMaster(gitBranchList)
 
     gitCommitsBehindMaster := int64(0)
