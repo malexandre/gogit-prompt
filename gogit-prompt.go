@@ -1,103 +1,94 @@
 package main
 
 import (
-    "fmt"
-    "os"
-    "os/exec"
-    "strings"
-    "strconv"
-    "bytes"
+	"bytes"
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 )
 
 func readCommand(cmdName string) string {
-    split := strings.Split(cmdName, " ")
-    cmd := exec.Command(split[0], split[1:]...)
+	split := strings.Split(cmdName, " ")
+	cmd := exec.Command(split[0], split[1:]...)
 
-    var out bytes.Buffer
-    var stderr bytes.Buffer
+	var out bytes.Buffer
+	var stderr bytes.Buffer
 
-    cmd.Stdout = &out
-    cmd.Stderr = &stderr
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
 
-    err := cmd.Run()
-    if err != nil {
-        return stderr.String()
-    }
+	err := cmd.Run()
+	if err != nil {
+		return stderr.String()
+	}
 
-    return out.String()
+	return out.String()
 }
 
-func checkMaster(gitBranchList string) bool {
-    lines := strings.Split(gitBranchList, "\n")
-    for i := 0; i < len(lines); i++ {
-		if (lines[i] != "" && lines[i][2:] == "master") {
-            return true
-        }
-    }
-
-    return false
+func getMainBarnch() string {
+	return readCommand("git symbolic-ref refs/remotes/origin/HEAD")
 }
 
-func countStringsWithPrefixInList(lines []string, prefix string) int64 {
-    count := int64(0)
-    for _, line := range lines {
-        if (strings.HasPrefix(line, prefix)) {
-            count += 1
-        }
-    }
+func countStringsWithPrefixInList(lines []string, prefix string) (count int) {
+	for _, line := range lines {
+		if strings.HasPrefix(line, prefix) {
+			count += 1
+		}
+	}
 
-    return count
+	return
 }
 
-func countCommitDiff(branch string, againstBranch string) (int64, int64) {
-    gitCommits := readCommand("git rev-list --left-right " + branch + "..." + againstBranch)
-    commits := strings.Split(gitCommits, "\n")
-    return countStringsWithPrefixInList(commits, "<"), countStringsWithPrefixInList(commits, ">")
+func countCommitDiff(branch string, againstBranch string) (int, int) {
+	gitCommits := readCommand("git rev-list --left-right " + branch + "..." + againstBranch)
+	commits := strings.Split(gitCommits, "\n")
+	return countStringsWithPrefixInList(commits, "<"), countStringsWithPrefixInList(commits, ">")
 }
 
 func main() {
-    text := " "
-    gitStatus := readCommand("git status --porcelain -b")
-    if (strings.HasPrefix(gitStatus, "fatal")) {
-        os.Exit(0)
-    }
+	var (
+		text          string = ""
+		currentBranch string = ""
+		remoteBranch  string = ""
+		mainBranch    string = ""
 
-    gitStatusLines := strings.Split(gitStatus, "\n")
-    branches := strings.Split(gitStatusLines[0][3:], "...")
+		gitCommitsBehindMain   int
+		gitCommitsAheadMain    int
+		gitCommitsBehindOrigin int
+		gitCommitsAheadOrigin  int
+	)
 
-    currentBranch := branches[0]
-    text += currentBranch
-    if (len(gitStatusLines) > 2) {
-        text += "*"
-    }
+	gitStatus := readCommand("git status --porcelain -b")
+	if strings.HasPrefix(gitStatus, "fatal") {
+		os.Exit(1)
+	}
 
-    remoteBranch := ""
-    if (len(branches) > 1) {
-        remoteData := strings.Split(branches[1], " ")
-        remoteBranch = remoteData[0]
-    }
+	gitStatusLines := strings.Split(gitStatus, "\n")
+	branches := strings.Split(gitStatusLines[0][3:], "...")
 
-    gitBranchList := readCommand("git branch --list master")
-    hasMaster := checkMaster(gitBranchList)
+	currentBranch = branches[0]
+	text += currentBranch
+	if len(gitStatusLines) > 2 {
+		text += "*"
+	}
 
-    gitCommitsBehindMaster := int64(0)
-    gitCommitsAheadMaster := int64(0)
-    gitCommitsBehindOrigin := int64(0)
-    gitCommitsAheadOrigin := int64(0)
+	if len(branches) > 1 {
+		remoteBranch = strings.Split(branches[1], " ")[0]
+	}
 
-    if (remoteBranch != "") {
-        gitCommitsBehindOrigin, gitCommitsAheadOrigin = countCommitDiff(remoteBranch, currentBranch)
-        text += fmt.Sprintf(" R[-%s|+%s]",
-                            strconv.FormatInt(gitCommitsBehindOrigin, 10),
-                            strconv.FormatInt(gitCommitsAheadOrigin, 10))
-    }
+	mainBranch = getMainBarnch()
 
-    if (hasMaster && remoteBranch != "origin/master") {
-        gitCommitsBehindMaster, gitCommitsAheadMaster = countCommitDiff("origin/master", currentBranch)
-        text += fmt.Sprintf(" M[-%s|+%s]",
-                            strconv.FormatInt(gitCommitsBehindMaster, 10),
-                            strconv.FormatInt(gitCommitsAheadMaster, 10))
-    }
+	if remoteBranch != "" {
+		gitCommitsBehindOrigin, gitCommitsAheadOrigin = countCommitDiff(remoteBranch, currentBranch)
+		text += fmt.Sprintf(" R[-%v|+%v]", gitCommitsBehindOrigin, gitCommitsAheadOrigin)
 
-    fmt.Println(text)
+		if !strings.Contains(mainBranch, remoteBranch) {
+			gitCommitsBehindMain, gitCommitsAheadMain = countCommitDiff(mainBranch, currentBranch)
+			text += fmt.Sprintf(" M[-%v|+%v]", gitCommitsBehindMain, gitCommitsAheadMain)
+
+		}
+	}
+
+	fmt.Print(text)
 }
