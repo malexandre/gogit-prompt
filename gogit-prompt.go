@@ -48,10 +48,10 @@ func countCommitDiff(branch string, againstBranch string) (int, int) {
 
 func main() {
 	var (
-		text          string = ""
-		currentBranch string = ""
-		remoteBranch  string = ""
-		mainBranch    string = ""
+		currentBranch     string = ""
+		changesInProgress string = ""
+		remoteBranch      string = ""
+		mainBranch        string = ""
 
 		gitCommitsBehindMain   int
 		gitCommitsAheadMain    int
@@ -60,6 +60,7 @@ func main() {
 	)
 
 	gitStatus := readCommand("git status --porcelain -b")
+	// No git in current folder
 	if strings.HasPrefix(gitStatus, "fatal") {
 		os.Exit(1)
 	}
@@ -68,9 +69,8 @@ func main() {
 	branches := strings.Split(gitStatusLines[0][3:], "...")
 
 	currentBranch = branches[0]
-	text += currentBranch
 	if len(gitStatusLines) > 2 {
-		text += "*"
+		changesInProgress += "*"
 	}
 
 	if len(branches) > 1 {
@@ -79,16 +79,20 @@ func main() {
 
 	mainBranch = getMainBarnch()
 
+	prompt := currentBranch + changesInProgress
 	if remoteBranch != "" {
 		gitCommitsBehindOrigin, gitCommitsAheadOrigin = countCommitDiff(remoteBranch, currentBranch)
-		text += fmt.Sprintf(" R[-%v|+%v]", gitCommitsBehindOrigin, gitCommitsAheadOrigin)
+		prompt += fmt.Sprintf(" R[-%v|+%v]", gitCommitsBehindOrigin, gitCommitsAheadOrigin)
 
 		if !strings.Contains(mainBranch, remoteBranch) {
 			gitCommitsBehindMain, gitCommitsAheadMain = countCommitDiff(mainBranch, currentBranch)
-			text += fmt.Sprintf(" M[-%v|+%v]", gitCommitsBehindMain, gitCommitsAheadMain)
+			prompt += fmt.Sprintf(" M[-%v|+%v]", gitCommitsBehindMain, gitCommitsAheadMain)
 
 		}
+	} else {
+		gitCommits := readCommand("git log --oneline")
+		prompt += fmt.Sprintf(" [-0|+%v]", len(strings.Split(gitCommits, "\n")))
 	}
 
-	fmt.Print(text)
+	fmt.Print(prompt)
 }
