@@ -27,7 +27,7 @@ func readCommand(cmdName string) string {
 }
 
 func getMainBarnch() string {
-	return readCommand("git symbolic-ref refs/remotes/origin/HEAD")
+	return strings.Split(readCommand("git symbolic-ref refs/remotes/origin/HEAD"), "\n")[0]
 }
 
 func countStringsWithPrefixInList(lines []string, prefix string) (count int) {
@@ -48,10 +48,10 @@ func countCommitDiff(branch string, againstBranch string) (int, int) {
 
 func main() {
 	var (
-		currentBranch     string = ""
-		changesInProgress string = ""
-		remoteBranch      string = ""
-		mainBranch        string = ""
+		currentBranch     = ""
+		changesInProgress = ""
+		remoteBranch      = ""
+		mainBranch        = ""
 
 		gitCommitsBehindMain   int
 		gitCommitsAheadMain    int
@@ -82,16 +82,16 @@ func main() {
 	prompt := "\ue725 " + currentBranch + changesInProgress
 	if remoteBranch != "" {
 		gitCommitsBehindOrigin, gitCommitsAheadOrigin = countCommitDiff(remoteBranch, currentBranch)
-		prompt += fmt.Sprintf(" \ue726[\uf175%v \uf176%v]", gitCommitsBehindOrigin, gitCommitsAheadOrigin)
+		prompt += fmt.Sprintf(" R[-%v +%v]", gitCommitsBehindOrigin, gitCommitsAheadOrigin)
 
 		if !strings.Contains(mainBranch, remoteBranch) {
 			gitCommitsBehindMain, gitCommitsAheadMain = countCommitDiff(mainBranch, currentBranch)
-			prompt += fmt.Sprintf(" \uf09b[\uf175%v \uf176%v]", gitCommitsBehindMain, gitCommitsAheadMain)
+			prompt += fmt.Sprintf(" M[-%v +%v]", gitCommitsBehindMain, gitCommitsAheadMain)
 
 		}
 	} else {
 		gitCommits := readCommand("git log --oneline")
-		prompt += fmt.Sprintf(" [\uf1750 \uf176%v]", len(strings.Split(gitCommits, "\n")))
+		prompt += fmt.Sprintf(" [-0 +%v]", len(strings.Split(gitCommits, "\n")))
 	}
 
 	fmt.Print(prompt)
